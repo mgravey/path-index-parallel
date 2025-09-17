@@ -1,157 +1,224 @@
 nValues = [5, 10, 15, 20, 30, 40, 50, 75];
-% Load precomputed data
-load('speedup_data_grid.mat');
+load('speedup_data_grid.mat');	% loads speedupData, simSizes, ksValues, nValues, maxNumberOfThread, nIter
 
-% Parameter definitions
+speedupData=speedupData(:,:,:,:,1:500);
+
+%%
+% --- NEW: aggregate over iterations (dimension 5) ---
+meanSpeedup = nanmean(speedupData, 5);
+stdSpeedup  = nanstd(speedupData, 0, 5);	% same units as ratio; we'll display as %
+
 threadings = 1:maxNumberOfThread;
 
-% Fixed parameter indices
-fixed_n = 5;          % n = 30
-fixed_size = 6;       % simSize = 200
-fixed_ks = 3;         % ks = 25
-threadIdx = 10;       % thread = 10
+% Fixed parameter indices (same as before)
+fixed_n = 5;			% n = 30
+fixed_size = 6;			% simSize = 200
+fixed_ks = 3;			% ks = 25
+threadIdx = 10;			% thread = 10
 
-%% --- Slice plots at thread 10 ---
+%% --- Slices @ fixed thread: row 1 = mean, row 2 = std ---
+f1 = figure('Name', 'Speedup slices (mean & std) at fixed thread', 'Position', [100 100 600 700]);
+t = tiledlayout(3,2, 'TileSpacing', 'compact', 'Padding', 'compact');
+sgtitle(t, sprintf('Speedup (ratio) at thread = %d — mean (left) & std (right)', threadIdx));
 
-f1 = figure('Name', 'Speedup slices at fixed thread', 'Position', [100 100 800 250]);
-t = tiledlayout(1,3, 'TileSpacing', 'compact', 'Padding', 'compact');
-sgtitle(t, sprintf('Speedup ratio slices at thread = %d', threadIdx));
+% 1. simSize vs ks @ fixed n
+slice1_mu = squeeze(meanSpeedup(:,:,fixed_n,threadIdx));
+slice1_sd = squeeze(stdSpeedup(:,:,fixed_n,threadIdx));
 
-% 1. simSize vs ks at fixed n
-nexttile;
-slice1 = squeeze(speedupData(:,:,fixed_n,threadIdx));
-imagesc(slice1');
-xlabel('simSize'); ylabel('ks');
-title(sprintf('n = %d', nValues(fixed_n)));
-set(gca, 'XTick', 1:length(simSizes), 'XTickLabel', simSizes);
-set(gca, 'YTick', 1:length(ksValues), 'YTickLabel', ksValues);
-axis xy;
-cb = colorbar;
-cb.Label.String = 'Speedup (%)';
-cb.Ticks = linspace(min(slice1(:)), max(slice1(:)), 6);
-cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', (x-1)*100), cb.Ticks, 'UniformOutput', false);
+nexttile; imagesc(slice1_mu'); axis xy
+overlayValues(gca, slice1_mu',-1);
 
-% 2. ks vs n at fixed simSize
-nexttile;
-slice2 = squeeze(speedupData(fixed_size,:,: ,threadIdx));
-imagesc(slice2);
-xlabel('n'); ylabel('ks');
-title(sprintf('simSize = %d', simSizes(fixed_size)));
-set(gca, 'XTick', 1:length(nValues), 'XTickLabel', nValues);
-set(gca, 'YTick', 1:length(ksValues), 'YTickLabel', ksValues);
-axis xy;
-cb = colorbar;
-cb.Label.String = 'Speedup (%)';
-cb.Ticks = linspace(min(slice2(:)), max(slice2(:)), 6);
-cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', (x-1)*100), cb.Ticks, 'UniformOutput', false);
+xlabel('simSize'); ylabel('ks'); title(sprintf('mean, n = %d', nValues(fixed_n)));
+set(gca,'XTick',1:length(simSizes),'XTickLabel',simSizes,'YTick',1:length(ksValues),'YTickLabel',ksValues);
+cb = colorbar; cb.Label.String = 'Speedup (%)';
+cb.Ticks = linspace(min(slice1_mu(:)), max(slice1_mu(:)), 6);
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%',(x-1)*100), cb.Ticks, 'UniformOutput', false);
 
-% 3. simSize vs n at fixed ks
-nexttile;
-slice3 = squeeze(speedupData(:,fixed_ks,:,threadIdx));
-imagesc(slice3);
-xlabel('n'); ylabel('simSize');
-title(sprintf('ks = %d', ksValues(fixed_ks)));
-set(gca, 'XTick', 1:length(nValues), 'XTickLabel', nValues);
-set(gca, 'YTick', 1:length(simSizes), 'YTickLabel', simSizes);
-axis xy;
-cb = colorbar;
-cb.Label.String = 'Speedup (%)';
-cb.Ticks = linspace(min(slice3(:)), max(slice3(:)), 6);
-cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', (x-1)*100), cb.Ticks, 'UniformOutput', false);
+nexttile; imagesc(slice1_sd'); axis xy
+overlayValues(gca, slice1_sd')
+xlabel('simSize'); ylabel('ks'); title('std across iterations');
+set(gca,'XTick',1:length(simSizes),'XTickLabel',simSizes,'YTick',1:length(ksValues),'YTickLabel',ksValues);
+cb = colorbar; cb.Label.String = 'Std of speedup (%)';
+cb.Ticks = linspace(min(slice1_sd(:)), max(slice1_sd(:)), 6);
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', x*100), cb.Ticks, 'UniformOutput', false);
 
-% Export figure
-export_fig(f1, 'speedup_slices_fixed_thread.png', '-png', '-transparent','-m4', '-r300');
+% 2. ks vs n @ fixed simSize
+slice2_mu = squeeze(meanSpeedup(fixed_size,:,:,threadIdx));
+slice2_sd = squeeze(stdSpeedup(fixed_size,:,:,threadIdx));
 
-% Caption (for LaTeX/paper)
-% Figure: Speedup ratios (in %) at fixed thread count = 10.
-% Left: variation with simSize and ks for n = 30.
-% Middle: variation with ks and n for simSize = 200.
-% Right: variation with simSize and n for ks = 25.
+nexttile; imagesc(slice2_mu); axis xy
+overlayValues(gca, slice2_mu,-1)
+xlabel('n'); ylabel('ks'); title(sprintf('mean, simSize = %d', simSizes(fixed_size)));
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(ksValues),'YTickLabel',ksValues);
+cb = colorbar; cb.Label.String = 'Speedup (%)';
+cb.Ticks = linspace(min(slice2_mu(:)), max(slice2_mu(:)), 6);
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%',(x-1)*100), cb.Ticks, 'UniformOutput', false);
 
-%% --- Max speedup and optimal thread count
+nexttile; imagesc(slice2_sd); axis xy
+overlayValues(gca, slice2_sd)
+xlabel('n'); ylabel('ks'); title('std across iterations');
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(ksValues),'YTickLabel',ksValues);
+cb = colorbar; cb.Label.String = 'Std of speedup (%)';
+cb.Ticks = linspace(min(slice2_sd(:)), max(slice2_sd(:)), 6);
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', x*100), cb.Ticks, 'UniformOutput', false);
 
-f2 = figure('Name', 'Max speedup and optimal threads', 'Position', [100 100 600 800]);
-t2 = tiledlayout(3,2, 'TileSpacing', 'compact', 'Padding', 'compact');
-sgtitle(t2, 'Max speedup and corresponding optimal thread count');
+% 3. simSize vs n @ fixed ks
+slice3_mu = squeeze(meanSpeedup(:,fixed_ks,:,threadIdx));
+slice3_sd = squeeze(stdSpeedup(:,fixed_ks,:,threadIdx));
 
-% 1. simSize vs ks at fixed n
-slice_all1 = squeeze(speedupData(:,:,fixed_n,:));
-[maxSpeedup1, maxIdx1] = max(slice_all1, [], 3);
+nexttile; imagesc(slice3_mu); axis xy
+overlayValues(gca, slice3_mu,-1)
+xlabel('n'); ylabel('simSize'); title(sprintf('mean, ks = %d', ksValues(fixed_ks)));
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(simSizes),'YTickLabel',simSizes);
+cb = colorbar; cb.Label.String = 'Speedup (%)';
+cb.Ticks = linspace(min(slice3_mu(:)), max(slice3_mu(:)), 6);
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%',(x-1)*100), cb.Ticks, 'UniformOutput', false);
 
-nexttile;
-imagesc(maxSpeedup1');
-xlabel('simSize'); ylabel('ks');
-title(sprintf('Max speedup at n = %d', nValues(fixed_n)));
-set(gca, 'XTick', 1:length(simSizes), 'XTickLabel', simSizes);
-set(gca, 'YTick', 1:length(ksValues), 'YTickLabel', ksValues);
-axis xy;
-cb = colorbar;
-cb.Label.String = 'Speedup (%)';
-cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', (x-1)*100), cb.Ticks, 'UniformOutput', false);
+nexttile; imagesc(slice3_sd); axis xy
+overlayValues(gca, slice3_sd)
+xlabel('n'); ylabel('simSize'); title('std across iterations');
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(simSizes),'YTickLabel',simSizes);
+cb = colorbar; cb.Label.String = 'Std of speedup (%)';
+cb.Ticks = linspace(min(slice3_sd(:)), max(slice3_sd(:)), 6);
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', x*100), cb.Ticks, 'UniformOutput', false);
 
-nexttile;
-imagesc(threadings(maxIdx1)');
-xlabel('simSize'); ylabel('ks');
-title(sprintf('Optimal threads (n = %d)', nValues(fixed_n)));
-set(gca, 'XTick', 1:length(simSizes), 'XTickLabel', simSizes);
-set(gca, 'YTick', 1:length(ksValues), 'YTickLabel', ksValues);
-axis xy;
+export_fig(f1, 'speedup_slices_fixed_thread_mean_std.png', '-png', '-transparent','-m4', '-r300');
+
+%% --- Max mean speedup & optimal threads (+ std at the optimum) ---
+% Use mean across iterations to pick the optimal thread count;
+% report both the max(mean) and the std at that argmax.
+
+f2 = figure('Name', 'Max mean speedup, optimal threads, and std @ optimum', 'Position', [100 100 1100 900]);
+t2 = tiledlayout(3,3, 'TileSpacing', 'compact', 'Padding', 'compact');
+sgtitle(t2, 'Max mean speedup (left), optimal threads (mid), std at optimum (right)');
+
+
+
+
+% 1) simSize vs ks @ fixed n
+slice_all1_mu = squeeze(meanSpeedup(:,:,fixed_n,:));	% [simSize, ks, thread]
+slice_all1_sd = squeeze(stdSpeedup(:,:,fixed_n,:));
+[maxMu1, maxIdx1] = max(slice_all1_mu, [], 3);
+
+% std at chosen thread index (per cell)
+idx1 = sub2ind(size(slice_all1_sd), ...
+	repmat((1:size(slice_all1_sd,1))',1,size(slice_all1_sd,2)), ...
+	repmat(1:size(slice_all1_sd,2),size(slice_all1_sd,1),1), ...
+	maxIdx1);
+stdAtOpt1 = slice_all1_sd(idx1);
+
+nexttile; imagesc(maxMu1'); axis xy
+overlayValues(gca,maxMu1',-1)
+xlabel('simSize'); ylabel('ks'); title(sprintf('Max mean speedup (n = %d)', nValues(fixed_n)));
+set(gca,'XTick',1:length(simSizes),'XTickLabel',simSizes,'YTick',1:length(ksValues),'YTickLabel',ksValues);
+cb = colorbar; cb.Label.String = 'Speedup (%)';
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%',(x-1)*100), cb.Ticks, 'UniformOutput', false);
+
+nexttile; imagesc(threadings(maxIdx1)'); axis xy
+%overlayValues(gca,threadings(maxIdx1)')
+xlabel('simSize'); ylabel('ks'); title(sprintf('Optimal threads (n = %d)', nValues(fixed_n)));
+set(gca,'XTick',1:length(simSizes),'XTickLabel',simSizes,'YTick',1:length(ksValues),'YTickLabel',ksValues);
 cb = colorbar; cb.Label.String = 'Threads';
 
-% 2. simSize vs n at fixed ks
-slice_all2 = squeeze(speedupData(:,fixed_ks,:,:));
-[maxSpeedup2, maxIdx2] = max(slice_all2, [], 3);
+nexttile; imagesc(stdAtOpt1'); axis xy
+overlayValues(gca,stdAtOpt1')
+xlabel('simSize'); ylabel('ks'); title('Std at optimum');
+set(gca,'XTick',1:length(simSizes),'XTickLabel',simSizes,'YTick',1:length(ksValues),'YTickLabel',ksValues);
+cb = colorbar; cb.Label.String = 'Std of speedup (%)';
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', x*100), cb.Ticks, 'UniformOutput', false);
 
-nexttile;
-imagesc(maxSpeedup2);
-xlabel('n'); ylabel('simSize');
-title(sprintf('Max speedup at ks = %d', ksValues(fixed_ks)));
-set(gca, 'XTick', 1:length(nValues), 'XTickLabel', nValues);
-set(gca, 'YTick', 1:length(simSizes), 'YTickLabel', simSizes);
-axis xy;
-cb = colorbar;
-cb.Label.String = 'Speedup (%)';
-cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', (x-1)*100), cb.Ticks, 'UniformOutput', false);
+% 2) simSize vs n @ fixed ks
+slice_all2_mu = squeeze(meanSpeedup(:,fixed_ks,:,:));	% [simSize, n, thread]
+slice_all2_sd = squeeze(stdSpeedup(:,fixed_ks,:,:));
+[maxMu2, maxIdx2] = max(slice_all2_mu, [], 3);
 
-nexttile;
-imagesc(threadings(maxIdx2));
-set(gca, 'ColorScale', 'log')
-xlabel('n'); ylabel('simSize');
-title(sprintf('Optimal threads (ks = %d)', ksValues(fixed_ks)));
-set(gca, 'XTick', 1:length(nValues), 'XTickLabel', nValues);
-set(gca, 'YTick', 1:length(simSizes), 'YTickLabel', simSizes);
-axis xy;
+idx2 = sub2ind(size(slice_all2_sd), ...
+	repmat((1:size(slice_all2_sd,1))',1,size(slice_all2_sd,2)), ...
+	repmat(1:size(slice_all2_sd,2),size(slice_all2_sd,1),1), ...
+	maxIdx2);
+stdAtOpt2 = slice_all2_sd(idx2);
+
+nexttile; imagesc(maxMu2); axis xy
+overlayValues(gca,maxMu2,-1)
+xlabel('n'); ylabel('simSize'); title(sprintf('Max mean speedup (ks = %d)', ksValues(fixed_ks)));
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(simSizes),'YTickLabel',simSizes);
+cb = colorbar; cb.Label.String = 'Speedup (%)';
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%',(x-1)*100), cb.Ticks, 'UniformOutput', false);
+
+nexttile; imagesc(threadings(maxIdx2)); set(gca,'ColorScale','log'); axis xy
+%overlayValues(gca,threadings(maxIdx2))
+xlabel('n'); ylabel('simSize'); title(sprintf('Optimal threads (ks = %d)', ksValues(fixed_ks)));
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(simSizes),'YTickLabel',simSizes);
 cb = colorbar; cb.Label.String = 'Threads';
 
-% 3. ks vs n at fixed simSize
-slice_all3 = squeeze(speedupData(fixed_size,:,:,:));
-[maxSpeedup3, maxIdx3] = max(slice_all3, [], 3);
+nexttile; imagesc(stdAtOpt2); axis xy
+overlayValues(gca,stdAtOpt2)
+xlabel('n'); ylabel('simSize'); title('Std at optimum');
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(simSizes),'YTickLabel',simSizes);
+cb = colorbar; cb.Label.String = 'Std of speedup (%)';
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', x*100), cb.Ticks, 'UniformOutput', false);
 
-nexttile;
-imagesc(maxSpeedup3);
-xlabel('n'); ylabel('ks');
-title(sprintf('Max speedup at simSize = %d', simSizes(fixed_size)));
-set(gca, 'XTick', 1:length(nValues), 'XTickLabel', nValues);
-set(gca, 'YTick', 1:length(ksValues), 'YTickLabel', ksValues);
-axis xy;
-cb = colorbar;
-cb.Label.String = 'Speedup (%)';
-cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', (x-1)*100), cb.Ticks, 'UniformOutput', false);
+% 3) ks vs n @ fixed simSize
+slice_all3_mu = squeeze(meanSpeedup(fixed_size,:,:,:));	% [ks, n, thread]
+slice_all3_sd = squeeze(stdSpeedup(fixed_size,:,:,:));
+[maxMu3, maxIdx3] = max(slice_all3_mu, [], 3);
 
-nexttile;
-imagesc(threadings(maxIdx3));
-xlabel('n'); ylabel('ks');
-title(sprintf('Optimal threads (simSize = %d)', simSizes(fixed_size)));
-set(gca, 'XTick', 1:length(nValues), 'XTickLabel', nValues);
-set(gca, 'YTick', 1:length(ksValues), 'YTickLabel', ksValues);
-axis xy;
+idx3 = sub2ind(size(slice_all3_sd), ...
+	repmat((1:size(slice_all3_sd,1))',1,size(slice_all3_sd,2)), ...
+	repmat(1:size(slice_all3_sd,2),size(slice_all3_sd,1),1), ...
+	maxIdx3);
+stdAtOpt3 = slice_all3_sd(idx3);
+
+nexttile; imagesc(maxMu3); axis xy
+overlayValues(gca,maxMu3,-1)
+xlabel('n'); ylabel('ks'); title(sprintf('Max mean speedup (simSize = %d)', simSizes(fixed_size)));
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(ksValues),'YTickLabel',ksValues);
+cb = colorbar; cb.Label.String = 'Speedup (%)';
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%',(x-1)*100), cb.Ticks, 'UniformOutput', false);
+
+nexttile; imagesc(threadings(maxIdx3)); axis xy
+%overlayValues(gca,threadings(maxIdx3))
+xlabel('n'); ylabel('ks'); title(sprintf('Optimal threads (simSize = %d)', simSizes(fixed_size)));
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(ksValues),'YTickLabel',ksValues);
 cb = colorbar; cb.Label.String = 'Threads';
 
-% Export figure
-export_fig(f2, 'max_speedup_optimal_threads.png', '-png', '-transparent','-m4', '-r300');
+nexttile; imagesc(stdAtOpt3); axis xy
+overlayValues(gca,stdAtOpt3)
+xlabel('n'); ylabel('ks'); title('Std at optimum');
+set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(ksValues),'YTickLabel',ksValues);
+cb = colorbar; cb.Label.String = 'Std of speedup (%)';
+cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', x*100), cb.Ticks, 'UniformOutput', false);
 
-% Caption (for LaTeX/paper)
-% Figure: Maximum speedup (in %) and optimal number of threads across dimensions.
-% Top row: simSize vs ks (n = 30).
-% Bottom row left: simSize vs n (ks = 25).
-% Bottom row right: ks vs n (simSize = 200).
+export_fig(f2, 'max_mean_speedup_opt_threads_std.png', '-png', '-transparent','-m4', '-r300');
+
+%%
+
+function overlayValues(ax, data, offset)
+    if nargin < 3
+        offset=0;
+    end
+    data=data';
+	caxis(ax,'auto');
+	lims = caxis(ax);
+	midc = mean(lims);
+
+	for i = 1:size(data,1)
+		for j = 1:size(data,2)
+			v = data(i,j);
+			if isnan(v), continue; end
+			txtCol = 'w';
+			if v > midc, txtCol = 'k'; end
+			val = (v+offset)*100;	% your new computation
+			if abs(val) < 10
+				str = sprintf('%.1f', val);   % one decimal if <10
+			else
+				str = sprintf('%.0f', val);   % integer if ≥10
+			end
+			text(ax, i, j, str, ...
+				'HorizontalAlignment','center', ...
+				'VerticalAlignment','middle', ...
+				'Color', txtCol, ...
+				'FontSize', 6);
+		end
+	end
+end

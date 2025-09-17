@@ -1,30 +1,113 @@
-% Define parameter ranges
-simSizes = [10, 25, 50, 100, 150, 200, 250, 350, 500];
-ksValues = [11, 15, 25, 51, 75];
-nValues = [5, 10, 15, 20, 30, 40, 50, 75];
-maxNumberOfThread = 5000;
+function RunSpeedupMeasure(localIter, machineID)
+	% ==============================
+	% Speedup computation (per machine)
+	% ==============================
 
-% Preallocate result array
-speedupData = nan(length(simSizes), length(ksValues), length(nValues), maxNumberOfThread);
-
-% Initialize progress bar
-totalIterations = length(simSizes) * length(ksValues) * length(nValues);
-currentIteration = 0;
-h = waitbar(0, 'Computing speedup data...');
-
-% Compute values with progress update
-for j = length(ksValues):-1:1
-	for k = length(nValues):-1:1
-        for i = length(simSizes):-1:1
-			speedupData(i,j,k,:) = speedup(simSizes(i), ksValues(j), nValues(k), maxNumberOfThread);
-			currentIteration = currentIteration + 1;
-			waitbar(currentIteration / totalIterations, h);
-		end
+	if nargin < 2
+		error('Usage: RunSpeedupMeasure(localIter, machineID)');
 	end
+
+	simSizes          = [10, 25, 50, 100, 150, 200, 250, 350, 500];
+	ksValues          = [11, 15, 25, 51, 75];
+	nValues           = [5, 10, 15, 20, 30, 40, 50, 75];
+	maxNumberOfThread = 5000;
+
+	outFile = sprintf('speedup_data_grid_part_%d.mat', machineID);
+
+	% Prepare storage, with resume/extend support
+	sz = [length(simSizes), length(ksValues), length(nValues), maxNumberOfThread, localIter];
+
+	if isfile(outFile)
+		loaded = load(outFile, 'speedupData','simSizes','ksValues','nValues','maxNumberOfThread','localIter');
+		
+		% Check dimension compatibility
+		if isequal(loaded.simSizes, simSizes) && ...
+		   isequal(loaded.ksValues, ksValues) && ...
+		   isequal(loaded.nValues, nValues) && ...
+		   loaded.maxNumberOfThread == maxNumberOfThread
+
+			speedupData = loaded.speedupData;
+			
+			% Extend localIter if needed
+			if localIter > loaded.localIter
+				oldSz = size(speedupData);
+				newSz = sz;
+				tmp = nan(newSz);
+				tmp(:,:,:,:,1:oldSz(5)) = speedupData;
+				speedupData = tmp;
+				fprintf('[%s] Extended localIter from %d to %d\n', ...
+					datestr(now,'yyyy-mm-dd HH:MM:SS'), loaded.localIter, localIter);
+			else
+				localIter = loaded.localIter; % keep existing
+			end
+			
+			fprintf('[%s] Resuming computation from %s\n', ...
+				datestr(now,'yyyy-mm-dd HH:MM:SS'), outFile);
+		else
+			warning('Parameter mismatch, starting fresh.');
+			speedupData = nan(sz);
+		end
+	else
+		speedupData = nan(sz);
+	end
+	
+	% Progress tracking
+	totalIter = prod(sz([1,2,3,5]));
+	processed = 0;
+	t0 = tic;
+
+	useGUI = usejava('desktop');	% true if MATLAB GUI available
+	if useGUI
+		h = waitbar(0, 'Computing speedup data...');
+	else
+		h = [];
+		fprintf('Starting speedup computation (%d iterations) on machine %d...\n', totalIter, machineID);
+	end
+
+	% ==============================
+	% Compute
+	% ==============================
+	for r = 1:localIter
+		for j = length(ksValues):-1:1
+			for k = length(nValues):-1:1
+				for i = length(simSizes):-1:1
+					% Compute only once
+					if isnan(speedupData(i,j,k,1,r))
+						speedupData(i,j,k,:,r) = speedup(simSizes(i), ksValues(j), nValues(k), maxNumberOfThread);
+					end
+
+					% Progress update
+					processed = processed + 1;
+					p = processed / totalIter;
+					elapsed = toc(t0);
+					etaSec = elapsed * (totalIter - processed) / processed;
+					hrs = floor(etaSec/3600);
+					mins = floor(mod(etaSec,3600)/60);
+					secs = floor(mod(etaSec,60));
+					msg = sprintf('Computing speedup data... %d/%d | ETA %02d:%02d:%02d', ...
+						processed, totalIter, hrs, mins, secs);
+
+					if useGUI
+						waitbar(p, h, msg);
+					else
+						if mod(processed,100)==0 || processed==totalIter
+							fprintf('%s\n', msg);
+						end
+					end
+				end
+			end
+		end
+
+		% Save after each iteration
+		save(outFile, 'speedupData','simSizes','ksValues','nValues','maxNumberOfThread','localIter','-v7.3');
+		fprintf('[%s] Saved %s after r=%d/%d\n', datestr(now,'yyyy-mm-dd HH:MM:SS'), outFile, r, localIter);
+	end
+
+	% Close waitbar if GUI
+	if useGUI && ~isempty(h)
+		close(h);
+	end
+
+	fprintf('Finished machine %d -> results in %s\n', machineID, outFile);
 end
 
-% Close progress bar
-close(h);
-
-% Save results to disk
-save('speedup_data_grid.mat', 'speedupData','simSizes','ksValues','nValues','maxNumberOfThread', '-v7.3');
