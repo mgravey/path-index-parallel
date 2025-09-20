@@ -1,7 +1,9 @@
 nValues = [5, 10, 15, 20, 30, 40, 50, 75];
 load('speedup_data_grid.mat');	% loads speedupData, simSizes, ksValues, nValues, maxNumberOfThread, nIter
 
-speedupData=speedupData(:,:,:,:,1:500);
+speedupData=speedupData(:,:,:,:,1:1000);
+
+sum(isnan(speedupData(:)))/numel(speedupData)
 
 %%
 % --- NEW: aggregate over iterations (dimension 5) ---

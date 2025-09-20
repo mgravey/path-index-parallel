@@ -64,6 +64,10 @@ function RunSpeedupMeasure(localIter, machineID)
 		fprintf('Starting speedup computation (%d iterations) on machine %d...\n', totalIter, machineID);
 	end
 
+	numSim = length(simSizes);
+	numKs  = length(ksValues);
+	numN   = length(nValues);
+	callsPerMachine = numSim * numKs * numN * localIter;
 	% ==============================
 	% Compute
 	% ==============================
@@ -73,6 +77,11 @@ function RunSpeedupMeasure(localIter, machineID)
 				for i = length(simSizes):-1:1
 					% Compute only once
 					if isnan(speedupData(i,j,k,1,r))
+						localID = (((r-1)*numKs + (j-1))*numN + (k-1))*numSim + (i-1);
+					
+						% Continuous global seed across all machines
+						seed = (machineID-1)*callsPerMachine + localID;
+						rng(seed,'twister');
 						speedupData(i,j,k,:,r) = speedup(simSizes(i), ksValues(j), nValues(k), maxNumberOfThread);
 					end
 
