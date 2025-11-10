@@ -1,0 +1,157 @@
+%% ============================================================
+%  FULL SCALING EXPERIMENT: variable TI size (constant -di)
+%  Author: Mathieu Gravey
+%  ============================================================
+addpath '/Users/mathieugravey/githubProject/G2S/build/matlab-build'
+
+%% --- GLOBAL PARAMETERS ---
+tiSizes = 2.^(1:6)*100;
+simSize = [200 200];				% fixed simulation grid
+kernel = ones([51,51]);
+n = 50;
+base_seed = 100;
+server = '138.232.184.13';
+n_iter = 10;
+use_wPO = [false true];
+threads_fixed = 64;
+
+% Generate one large random TI, from which we crop
+maxSize = max(tiSizes);
+rng(0);
+bigTI = randn(maxSize);				% Gaussian random field
+fprintf('Generated bigTI (%dx%d)\n', maxSize, maxSize);
+
+%% ============================================================
+%  PHASE 1 — JOB SUBMISSION
+%  ============================================================
+fprintf('\n=============================\n');
+fprintf('=== PHASE 1: SUBMIT JOBS ===\n');
+fprintf('=============================\n');
+
+all_job_table = {};
+
+for s = 1:numel(tiSizes)
+	currSize = tiSizes(s);
+	fprintf('\n=== Submitting for TI size = %dx%d ===\n', currSize, currSize);
+
+	% Crop from the random field
+	ti = bigTI(1:currSize, 1:currSize);
+	path = reshape(randperm(prod(simSize)), simSize);
+
+	for iter = 1:n_iter
+		curr_seed = base_seed + iter;
+		fprintf('\n--- Iteration %d / %d ---\n', iter, n_iter);
+
+		for w = 1:numel(use_wPO)
+			args = {'-sa',server,'-a','qs', ...
+					'-ti',ti,'-di',nan(simSize),'-dt',[0], ...
+					'-k',1.2,'-n',n,'-ki',kernel, ...
+					'-j',threads_fixed,'-sp',path,'-s',curr_seed, ...
+					'-submitOnly','-silent'};
+			if use_wPO(w)
+				args{end+1} = '-wPO';
+			end
+
+			jobid = g2s(args{:});
+			all_job_table = [all_job_table; {jobid, threads_fixed, use_wPO(w), iter, currSize}];
+			fprintf('Submitted job %s (wPO=%d, iter=%d, TI=%dx%d)\n', ...
+					jobid, use_wPO(w), iter, currSize, currSize);
+		end
+	end
+end
+
+save('submitted_jobs_all_TI.mat','all_job_table');
+disp('✅ All jobs submitted and job table saved.');
+
+%% ============================================================
+%  PHASE 2 — DOWNLOAD RESULTS
+%  ============================================================
+fprintf('\n==============================\n');
+fprintf('=== PHASE 2: DOWNLOAD DATA ===\n');
+fprintf('==============================\n');
+
+load('submitted_jobs_all_TI.mat');
+results_all = {};
+
+for s = 1:numel(tiSizes)
+	currSize = tiSizes(s);
+	fprintf('\n=== Downloading results for TI size = %dx%d ===\n', currSize, currSize);
+
+	results_size = {};
+
+	for iter = 1:n_iter
+		iter_mask = (cell2mat(all_job_table(:,4)) == iter) & ...
+					(cell2mat(all_job_table(:,5)) == currSize);
+		iter_jobs = all_job_table(iter_mask,:);
+
+		fprintf('--- Iteration %d / %d (%d jobs) ---\n', iter, n_iter, size(iter_jobs,1));
+
+		for i = 1:size(iter_jobs,1)
+			jobid = iter_jobs{i,1};
+			wpo = iter_jobs{i,3};
+			fprintf('Downloading %s (wPO=%d, iter=%d)\n', jobid, wpo, iter);
+			try
+				[data, t] = g2s('-sa',server,'-waitAndDownload',jobid);
+				results_size = [results_size; {jobid, threads_fixed, wpo, t, iter, currSize}];
+				fprintf('✅ Job %s done (%.2fs)\n', jobid, t);
+			catch ME
+				warning('⚠️ Failed to download %s: %s', jobid, ME.message);
+			end
+		end
+	end
+
+	save(sprintf('results_TI_%dx%d.mat', currSize, currSize), 'results_size');
+	results_all = [results_all; results_size];
+	fprintf('✅ Saved results for TI = %dx%d\n', currSize, currSize);
+end
+
+save('results_all_TI.mat','results_all');
+disp('🎉 All results downloaded and saved.');
+
+%% ============================================================
+%  PHASE 3 — AGGREGATION & RELATIVE GAIN COMPUTATION
+%  ============================================================
+load('results_all_TI.mat','results_all');
+
+TI_u = unique(cell2mat(results_all(:,6)));
+use_wPO_u = unique(cell2mat(results_all(:,3)));
+
+timeData = nan(numel(TI_u), numel(use_wPO_u), n_iter);
+
+for r = 1:size(results_all,1)
+	ti = results_all{r,6};
+	wpo = results_all{r,3};
+	t = results_all{r,4};
+	iter = results_all{r,5};
+
+	ti_idx = find(TI_u == ti);
+	wpo_idx = find(use_wPO_u == wpo);
+	timeData(ti_idx, wpo_idx, iter) = t;
+end
+
+meanTime = nanmean(timeData, 3);
+stdTime  = nanstd(timeData, 0, 3);
+
+gainRatio = meanTime(:,1) ./ meanTime(:,2);	% no-wPO / wPO
+
+save('gain_scaling_TI.mat','TI_u','use_wPO_u','meanTime','stdTime','gainRatio');
+
+%% ============================================================
+%  PHASE 4 — VISUALIZATION
+%  ============================================================
+f = figure('Name','Gain vs TI size','Position',[100 100 900 700]);
+yyaxis left
+errorbar(TI_u, gainRatio, nanstd(gainRatio,0,2), '-o','LineWidth',1.5);
+xlabel('TI size (pixels per side)');
+ylabel('Relative gain (no-wPO / wPO)');
+title('Parallel Gain vs TI size (j = 64)');
+grid on
+
+yyaxis right
+plot(TI_u, meanTime(:,1), '--s');
+ylabel('Mean runtime (s)');
+legend('Relative gain','Mean runtime (no-wPO)','Location','northwest');
+
+set(gca,'XScale','log','YScale','log');
+export_fig(f,'gain_scaling_vs_TI.png','-png','-transparent','-m4','-r300');
+disp('✅ Visualization saved: gain_scaling_vs_TI.png');
