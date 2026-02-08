@@ -6,14 +6,14 @@ nMachines = numel(files);
 load(files(1).name, 'simSizes','ksValues','nValues','maxNumberOfThread','localIter');
 nIter = localIter * nMachines;
 
-sz = [length(simSizes), length(ksValues), length(nValues), maxNumberOfThread, nIter];
+sz = [length(simSizes), length(ksValues), length(nValues), maxNumberOfThread, nIter,2];
 speedupDataAll = nan(sz);
 
 % Concatenate along 5th dim
 idx = 1;
 for m = 1:nMachines
 	load(files(m).name, 'speedupData','localIter');
-	speedupDataAll(:,:,:,:,idx:idx+localIter-1) = speedupData;
+	speedupDataAll(:,:,:,:,idx:idx+localIter-1,:) = speedupData;
 	idx = idx + localIter;
 end
 

@@ -1,4 +1,4 @@
-function speedupRatio = speedup(simSize, ks, n, maxNumberOfThread)
+function [speedupRatio,speedupGPRatio] = speedup(simSize, ks, n, maxNumberOfThread)
 
 	% Ensure square simulation size
 	simSize = [simSize simSize];
@@ -17,6 +17,7 @@ function speedupRatio = speedup(simSize, ks, n, maxNumberOfThread)
 	% Optimal path by sorted dependency
 	[~, idx] = sort(dep(path));
 	optimalPath = path(idx);
+    groupedPathCount=getGroup(path,dep);
 
 	% Threading simulation
 	threadings = 1:maxNumberOfThread;
@@ -30,9 +31,10 @@ function speedupRatio = speedup(simSize, ks, n, maxNumberOfThread)
 	% Time estimation
 	timePara = (length(path) + extraWaiting ./ threadings') ./ threadings';
 	timeParaOP = (length(path) + extraWaitingOP ./ threadings') ./ threadings';
-
+    timeParaGroup=sum(ceil(groupedPathCount'./threadings'),2)./ threadings';
 	% Return speedup ratio
 	speedupRatio = timePara ./ timeParaOP;
+    speedupGPRatio = timeParaGroup ./ timeParaOP;
 end
 
 

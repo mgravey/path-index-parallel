@@ -15,7 +15,7 @@ function RunSpeedupMeasure(localIter, machineID)
 	outFile = sprintf('speedup_data_grid_part_%d.mat', machineID);
 
 	% Prepare storage, with resume/extend support
-	sz = [length(simSizes), length(ksValues), length(nValues), maxNumberOfThread, localIter];
+	sz = [length(simSizes), length(ksValues), length(nValues), maxNumberOfThread, localIter,2];
 
 	if isfile(outFile)
 		loaded = load(outFile, 'speedupData','simSizes','ksValues','nValues','maxNumberOfThread','localIter');
@@ -33,7 +33,7 @@ function RunSpeedupMeasure(localIter, machineID)
 				oldSz = size(speedupData);
 				newSz = sz;
 				tmp = nan(newSz);
-				tmp(:,:,:,:,1:oldSz(5)) = speedupData;
+				tmp(:,:,:,:,1:oldSz(5),:) = speedupData;
 				speedupData = tmp;
 				fprintf('[%s] Extended localIter from %d to %d\n', ...
 					datestr(now,'yyyy-mm-dd HH:MM:SS'), loaded.localIter, localIter);
@@ -76,13 +76,15 @@ function RunSpeedupMeasure(localIter, machineID)
 			for k = length(nValues):-1:1
 				for i = length(simSizes):-1:1
 					% Compute only once
-					if isnan(speedupData(i,j,k,1,r))
+					if isnan(speedupData(i,j,k,1,r,1))
 						localID = (((r-1)*numKs + (j-1))*numN + (k-1))*numSim + (i-1);
 					
 						% Continuous global seed across all machines
 						seed = (machineID-1)*callsPerMachine + localID;
 						rng(seed,'twister');
-						speedupData(i,j,k,:,r) = speedup(simSizes(i), ksValues(j), nValues(k), maxNumberOfThread);
+                        [v0,v1]=speedup(simSizes(i), ksValues(j), nValues(k), maxNumberOfThread);
+						speedupData(i,j,k,:,r,1) = v0;
+                        speedupData(i,j,k,:,r,2) = v1;
 					end
 
 					% Progress update

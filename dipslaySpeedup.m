@@ -1,7 +1,18 @@
 nValues = [5, 10, 15, 20, 30, 40, 50, 75];
 load('speedup_data_grid.mat');	% loads speedupData, simSizes, ksValues, nValues, maxNumberOfThread, nIter
 
-speedupData=speedupData(:,:,:,:,1:1000);
+% Select metric when a 6th dimension is present:
+%   1 = baseline (original)
+%   2 = groupedPath
+useGroupedPath = false;
+metricIdx = 1;
+metricLabel = 'baseline';
+if useGroupedPath
+	metricIdx = 2;
+	metricLabel = 'groupedPath';
+end
+
+speedupData = speedupData(:,:,:,:,1:1000,metricIdx);
 
 sum(isnan(speedupData(:)))/numel(speedupData)
 
@@ -21,7 +32,7 @@ threadIdx = 10;			% thread = 10
 %% --- Slices @ fixed thread: row 1 = mean, row 2 = std ---
 f1 = figure('Name', 'Speedup slices (mean & std) at fixed thread', 'Position', [100 100 600 700]);
 t = tiledlayout(3,2, 'TileSpacing', 'compact', 'Padding', 'compact');
-sgtitle(t, sprintf('Speedup (ratio) at thread = %d — mean (left) & std (right)', threadIdx));
+sgtitle(t, sprintf('Speedup (ratio) at thread = %d — mean (left) & std (right) [%s]', threadIdx, metricLabel));
 
 % 1. simSize vs ks @ fixed n
 slice1_mu = squeeze(meanSpeedup(:,:,fixed_n,threadIdx));
@@ -92,7 +103,7 @@ export_fig(f1, 'speedup_slices_fixed_thread_mean_std.png', '-png', '-transparent
 
 f2 = figure('Name', 'Max mean speedup, optimal threads, and std @ optimum', 'Position', [100 100 1100 900]);
 t2 = tiledlayout(3,3, 'TileSpacing', 'compact', 'Padding', 'compact');
-sgtitle(t2, 'Max mean speedup (left), optimal threads (mid), std at optimum (right)');
+sgtitle(t2, sprintf('Max mean speedup (left), optimal threads (mid), std at optimum (right) [%s]', metricLabel));
 
 
 
