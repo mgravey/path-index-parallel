@@ -5,6 +5,7 @@ load('speedup_data_grid.mat');	% loads speedupData, simSizes, ksValues, nValues,
 %   1 = baseline (original)
 %   2 = groupedPath
 useGroupedPath = false;
+relative=true;
 metricIdx = 1;
 metricLabel = 'baseline';
 if useGroupedPath
@@ -12,7 +13,11 @@ if useGroupedPath
 	metricLabel = 'groupedPath';
 end
 
-speedupData = speedupData(:,:,:,:,1:1000,metricIdx);
+if relative
+    speedupData = speedupData(:,:,:,:,1:min(end,1000),2)./speedupData(:,:,:,:,1:min(end,1000),1);
+else
+    speedupData = speedupData(:,:,:,:,1:min(end,1000),metricIdx);
+end
 
 sum(isnan(speedupData(:)))/numel(speedupData)
 
@@ -94,8 +99,7 @@ set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(simSizes
 cb = colorbar; cb.Label.String = 'Std of speedup (%)';
 cb.Ticks = linspace(min(slice3_sd(:)), max(slice3_sd(:)), 6);
 cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', x*100), cb.Ticks, 'UniformOutput', false);
-
-export_fig(f1, 'speedup_slices_fixed_thread_mean_std.png', '-png', '-transparent','-m4', '-r300');
+%export_fig(f1, 'speedup_slices_fixed_thread_mean_std.png', '-png', '-transparent','-m4', '-r300');
 
 %% --- Max mean speedup & optimal threads (+ std at the optimum) ---
 % Use mean across iterations to pick the optimal thread count;
@@ -202,7 +206,7 @@ set(gca,'XTick',1:length(nValues),'XTickLabel',nValues,'YTick',1:length(ksValues
 cb = colorbar; cb.Label.String = 'Std of speedup (%)';
 cb.TickLabels = arrayfun(@(x) sprintf('%.0f%%', x*100), cb.Ticks, 'UniformOutput', false);
 
-export_fig(f2, 'max_mean_speedup_opt_threads_std.png', '-png', '-transparent','-m4', '-r300');
+%export_fig(f2, 'max_mean_speedup_opt_threads_std.png', '-png', '-transparent','-m4', '-r300');
 
 %%
 

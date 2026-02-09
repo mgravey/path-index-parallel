@@ -31,7 +31,7 @@ function [speedupRatio,speedupGPRatio] = speedup(simSize, ks, n, maxNumberOfThre
 	% Time estimation
 	timePara = (length(path) + extraWaiting ./ threadings') ./ threadings';
 	timeParaOP = (length(path) + extraWaitingOP ./ threadings') ./ threadings';
-    timeParaGroup=sum(ceil(groupedPathCount'./threadings'),2)./ threadings';
+    timeParaGroup=sum(ceil(groupedPathCount./threadings))';
 	% Return speedup ratio
 	speedupRatio = timePara ./ timeParaOP;
     speedupGPRatio = timeParaGroup ./ timeParaOP;
