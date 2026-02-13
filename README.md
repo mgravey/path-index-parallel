@@ -52,10 +52,17 @@ This project supports the findings from:
 1. **Run simulations across parameter grid:**
 
 ```matlab
-RunSpeedupMeasure
+% Serial mode (default)
+RunSpeedupMeasure(localIter, machineID)
+
+% Parallel mode (use default pool size)
+RunSpeedupMeasure(localIter, machineID, true)
+
+% Parallel mode (force number of workers/cores)
+RunSpeedupMeasure(localIter, machineID, true, numWorkers)
 ````
 
-This generates `speedup_data_grid.mat`, containing all computed speedup ratios.
+This generates `speedup_data_grid_part_<machineID>.mat`, containing all computed speedup ratios.
 
 2. **Visualize results:**
 
